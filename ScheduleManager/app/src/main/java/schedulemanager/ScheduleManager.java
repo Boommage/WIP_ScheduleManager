@@ -11,6 +11,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+//import org.checkerframework.checker.units.qual.g;
+
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.extensions.java6.auth.oauth2.AuthorizationCodeInstalledApp;
 import com.google.api.client.extensions.jetty.auth.oauth2.LocalServerReceiver;
@@ -22,17 +24,19 @@ import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.util.store.FileDataStoreFactory;
 import com.google.api.services.sheets.v4.Sheets;
 import com.google.api.services.sheets.v4.SheetsScopes;
-import com.google.api.services.sheets.v4.Sheets.Spreadsheets.Values.Update;
-import com.google.api.services.sheets.v4.model.AppendValuesResponse;
-import com.google.api.services.sheets.v4.model.UpdateValuesResponse;
+import com.google.api.services.sheets.v4.model.BatchUpdateSpreadsheetRequest;
+import com.google.api.services.sheets.v4.model.DeleteDimensionRequest;
+import com.google.api.services.sheets.v4.model.DimensionRange;
+import com.google.api.services.sheets.v4.model.Request;
 import com.google.api.services.sheets.v4.model.ValueRange;
 
 public class ScheduleManager
 {
   private static Sheets sheetService;
   private static final String APPLICATION_NAME = "TCU SCHEDULE MANAGER";
-  private static final String SPREADSHEET_ID = "1Jpj5GbpAXukb07nTTKnDOMspYc-BESg8knN8FHBe6As";
+  public static final String SPREADSHEET_ID = "1Jpj5GbpAXukb07nTTKnDOMspYc-BESg8knN8FHBe6As";
   private static final JsonFactory JSON_FACTORY = GsonFactory.getDefaultInstance();
+  private static final String totalList = "A2:D";
 
   private static Credential authorize() throws IOException, GeneralSecurityException
   {
@@ -50,60 +54,98 @@ public class ScheduleManager
     Credential cred = authorize();
     return new Sheets.Builder(GoogleNetHttpTransport.newTrustedTransport(), JSON_FACTORY, cred).setApplicationName(APPLICATION_NAME).build();
   }
-
-  public static ArrayList<List<Object>> dateEdit() throws IOException, GeneralSecurityException
+  /**
+   * Finds the real world current date
+   * @return returns the current date
+   */
+  public static String currentDateFinder()
   {
-    ArrayList<List<Object>> newDates = new ArrayList<List<Object>>();
     DateTimeFormatter format = DateTimeFormatter.ofPattern("MM/dd/yy");
     String currentDate = LocalDate.now().format(format);
-    String setDate;
-    int currentMonth = Integer.parseInt(""+currentDate.charAt(0)+currentDate.charAt(1));
-    int setDay;
-    int currentDay = Integer.parseInt(""+currentDate.charAt(3)+currentDate.charAt(4));
-    int setMonth;
-    int currentYear = Integer.parseInt(""+currentDate.charAt(6)+currentDate.charAt(7));
-    int setYear;
-    sheetService = getSheetService();
-    String totalList = "A2:D";
-    ValueRange grab = sheetService.spreadsheets().values().get(SPREADSHEET_ID, totalList).execute();
-    List<List<Object>> dates = grab.getValues();
+    return currentDate;
+  }
+  /**
+   * Finds the real world current day
+   * @return returns the current day
+   */
+  public static int currentDayFinder()
+  {
+    String date = currentDateFinder();
+    int currentDay = Integer.parseInt(""+date.charAt(3)+date.charAt(4));
+    return currentDay;
+  }
+  /**
+   * Finds the real world current month
+   * @return returns the current month
+   */
+  public static int currentMonthFinder()
+  {
+    String date = currentDateFinder();
+    int currentMonth = Integer.parseInt(""+date.charAt(0)+date.charAt(1));
+    return currentMonth;
+  }
+  /**
+   * Finds the real world current year
+   * @return returns the current year
+   */
+  public static int currentYearFinder()
+  {
+    String date = currentDateFinder();
+    int currentYear = Integer.parseInt(""+date.charAt(6)+date.charAt(7));
+    return currentYear;
+  }
+  /**
+   * Deletes all expired assignment dates
+   * @throws IOException
+   * @throws GeneralSecurityException
+   */
+  public static void deleteOldDates() throws IOException, GeneralSecurityException
+  {
+    //Declares the current day, month, and year
+    int currentMonth = currentMonthFinder();
+    int currentDay = currentDayFinder();
+    int currentYear = currentYearFinder();
 
+    //Places each value of the spreadsheet into an array
+    ValueRange grab = getSheetService().spreadsheets().values().get(SPREADSHEET_ID, totalList).execute();
+    List<List<Object>> dates = grab.getValues();
+    
+    //Traverses the array and compares each rows date with the current date
     if (dates == null || dates.isEmpty())
       System.out.println("No data found...");
     else
       for(List row : dates)
       {
-        setDate = row.get(2).toString();
-        setMonth = Integer.parseInt(""+setDate.charAt(0)+setDate.charAt(1));
-        setDay = Integer.parseInt(""+setDate.charAt(3)+setDate.charAt(4));
-        setYear = Integer.parseInt(""+setDate.charAt(6)+setDate.charAt(7));
-        if(currentYear < setYear)
-          newDates.add(row);
-        else if(currentMonth < setMonth && currentYear == setYear)
-          newDates.add(row);
-        else if(currentDay < setDay && currentYear == setYear && currentMonth == setMonth)
-          newDates.add(row);
+        //Finds the specific rows date
+        String setDate = row.get(2).toString();
+        //Sets the day, month, and year off of the rows date
+        int setMonth = Integer.parseInt(""+setDate.charAt(0)+setDate.charAt(1));
+        int setDay = Integer.parseInt(""+setDate.charAt(3)+setDate.charAt(4));
+        int setYear = Integer.parseInt(""+setDate.charAt(6)+setDate.charAt(7));
+
+        //Sets necessary values for the deletion of a row
+        BatchUpdateSpreadsheetRequest batchUpdate = new BatchUpdateSpreadsheetRequest();
+        Request delete = new Request().setDeleteDimension(new DeleteDimensionRequest().setRange(new DimensionRange().setSheetId(0).setDimension("ROWS").setStartIndex(1).setEndIndex(2)));
+        List<Request> deletions = new ArrayList<Request>();
+
+        //If the rows date is older than the current date then the row will be deleted
+        if(currentYear > setYear)
+          deleteCall(delete, deletions, batchUpdate);
+        else if(currentMonth > setMonth && currentYear == setYear)
+          deleteCall(delete, deletions, batchUpdate);
+        else if(currentDay > setDay && currentYear == setYear && currentMonth == setMonth)
+          deleteCall(delete, deletions, batchUpdate);
       }
-      if (dates == null || dates.isEmpty())
-        System.out.println("No data found...");
-      else
-        for(List row : newDates)
-        {
-          System.out.println(row);
-        }
-      return newDates;
   }
-  public static void rowReplacer() throws IOException, GeneralSecurityException 
+  private static void deleteCall(Request r, List<Request> l, BatchUpdateSpreadsheetRequest b) throws IOException, GeneralSecurityException
   {
-    //ValueRange newRowText = new ValueRange().setValues(Arrays.asList(Arrays.asList("Changed")));
-    ValueRange newRowText = new ValueRange().setValues(dateEdit());
-    UpdateValuesResponse rowchanger = sheetService.spreadsheets().values().update(SPREADSHEET_ID,"A68", newRowText).setValueInputOption("RAW").execute();
+    l.add(r);
+    b.setRequests(l);
+    getSheetService().spreadsheets().batchUpdate(SPREADSHEET_ID, b).execute();
   }
 
   public static void main(String[] args) throws IOException, GeneralSecurityException
   {
-    System.out.println("GAMEING YAHOOO!!");
-    //dateEdit();
-    rowReplacer();
+    deleteOldDates();
   }
 }
