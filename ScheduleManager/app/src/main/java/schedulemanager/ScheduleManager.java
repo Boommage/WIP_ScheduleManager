@@ -39,6 +39,9 @@ public class ScheduleManager
   private static final JsonFactory JSON_FACTORY = GsonFactory.getDefaultInstance();
   private static final String totalList = "A2:D";
 
+  /**
+   * Sets the spreadsheet ID basesd on the users entered URL
+   */
   public static void sheetIDSetter()
   {
     Scanner user = new Scanner(System.in);
@@ -63,6 +66,12 @@ public class ScheduleManager
     user.close();
   }
 
+  /**
+   * Authorizes the program with Google's services
+   * @return Returns the approved crendentials
+   * @throws IOException
+   * @throws GeneralSecurityException
+   */
   private static Credential authorize() throws IOException, GeneralSecurityException
   {
     InputStream input = SheetsAndJava.class.getResourceAsStream("/credentials.json");
@@ -73,7 +82,12 @@ public class ScheduleManager
     Credential cred = new AuthorizationCodeInstalledApp(codeFlow,new LocalServerReceiver()).authorize("user");
     return cred;
   }
-  
+  /**
+   * Establishes Google's Google Sheets service and builds a Google sheets object enabling me to edit and/or create sheets
+   * @return Returns the Google Sheets object
+   * @throws IOException
+   * @throws GeneralSecurityException
+   */
   public static Sheets getSheetService() throws IOException, GeneralSecurityException
   {
     Credential cred = authorize();
