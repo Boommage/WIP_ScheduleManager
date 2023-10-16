@@ -10,6 +10,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Scanner;
 
 //import org.checkerframework.checker.units.qual.g;
 
@@ -34,9 +35,33 @@ public class ScheduleManager
 {
   private static Sheets sheetService;
   private static final String APPLICATION_NAME = "TCU SCHEDULE MANAGER";
-  private static final String SPREADSHEET_ID = "1Jpj5GbpAXukb07nTTKnDOMspYc-BESg8knN8FHBe6As";
+  private static String spreadsheetID = "1Jpj5GbpAXukb07nTTKnDOMspYc-BESg8knN8FHBe6As";
   private static final JsonFactory JSON_FACTORY = GsonFactory.getDefaultInstance();
   private static final String totalList = "A2:D";
+
+  public static void sheetIDSetter()
+  {
+    Scanner user = new Scanner(System.in);
+    boolean sheetSet = false;
+    while(sheetSet == false)
+    {
+    
+    System.out.println("\nPlease enter your google sheets url");
+    String sheetURL = user.nextLine();
+    int startIndex = sheetURL.indexOf("/spreadsheets/d/");
+    int endIndex = sheetURL.indexOf("/edit");
+    if(startIndex > 0 && endIndex > 0)
+    {
+      spreadsheetID = sheetURL.substring(startIndex+16,endIndex); 
+      sheetSet = true;
+    }
+    else if(startIndex > 0)
+      System.out.println("\nERROR. INVALID URL. PLEASE CHANGE SHEET TO EDIT MODE");
+    else
+      System.out.println("\nERROR. INVALID SHEET URL.");
+    }
+    user.close();
+  }
 
   private static Credential authorize() throws IOException, GeneralSecurityException
   {
@@ -94,20 +119,23 @@ public class ScheduleManager
     int currentYear = Integer.parseInt(""+date.charAt(6)+date.charAt(7));
     return currentYear;
   }
+
   /**
-   * Deletes all expired assignment dates
+   * Calls for the deletion of all expired assignment dates
    * @throws IOException
    * @throws GeneralSecurityException
    */
   public static void deleteOldDates() throws IOException, GeneralSecurityException
   {
+    //Counts how many rows were deleted
+    int counter = 0;
     //Declares the current day, month, and year
     int currentMonth = currentMonthFinder();
     int currentDay = currentDayFinder();
     int currentYear = currentYearFinder();
 
     //Places each value of the spreadsheet into an array
-    ValueRange grab = getSheetService().spreadsheets().values().get(SPREADSHEET_ID, totalList).execute();
+    ValueRange grab = getSheetService().spreadsheets().values().get(spreadsheetID, totalList).execute();
     List<List<Object>> dates = grab.getValues();
     
     //Traverses the array and compares each rows date with the current date
@@ -130,22 +158,44 @@ public class ScheduleManager
 
         //If the rows date is older than the current date then the row will be deleted
         if(currentYear > setYear)
+        {
           deleteCall(delete, deletions, batchUpdate);
+          counter++;
+        }
         else if(currentMonth > setMonth && currentYear == setYear)
+        {
           deleteCall(delete, deletions, batchUpdate);
+          counter++;
+        }
         else if(currentDay > setDay && currentYear == setYear && currentMonth == setMonth)
+        {
           deleteCall(delete, deletions, batchUpdate);
+          counter++;
+        }
       }
+      if(counter == 0)
+        System.out.println("Every row is up to date!");
+      else
+        System.out.println(counter+" row(s) have been deleted!");
   }
+  /**
+   * Is the actual method that deletes the the row
+   * @param r The request to delete
+   * @param l The array that stores the requests
+   * @param b Updates the spreadsheet so that the deletion executes
+   * @throws IOException
+   * @throws GeneralSecurityException
+   */
   private static void deleteCall(Request r, List<Request> l, BatchUpdateSpreadsheetRequest b) throws IOException, GeneralSecurityException
   {
     l.add(r);
     b.setRequests(l);
-    getSheetService().spreadsheets().batchUpdate(SPREADSHEET_ID, b).execute();
+    getSheetService().spreadsheets().batchUpdate(spreadsheetID, b).execute();
   }
 
   public static void main(String[] args) throws IOException, GeneralSecurityException
   {
+    sheetIDSetter();
     deleteOldDates();
   }
 }
