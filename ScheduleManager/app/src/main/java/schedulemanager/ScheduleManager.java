@@ -168,7 +168,8 @@ public class ScheduleManager
       else
         System.out.println("\n"+counter+" old row(s) have been deleted!");
   }
-  public static void menuInputMismatchCatcher(/*Parameter is a static void method*/)
+
+  public static void menuInputMismatchCatcher(/*Parameter is a static void method*/)//Currently an unused method
   {
     //I need to figure out how to make this possible
     //The key to figuring this out is through lambda expressions
