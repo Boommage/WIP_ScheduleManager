@@ -9,6 +9,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.InputMismatchException;
 import java.util.List;
 import java.util.Scanner;
 
@@ -35,9 +36,10 @@ public class ScheduleManager
 {
   private static Sheets sheetService;
   private static final String APPLICATION_NAME = "TCU SCHEDULE MANAGER";
-  private static String spreadsheetID = "1Jpj5GbpAXukb07nTTKnDOMspYc-BESg8knN8FHBe6As";
+  private static String spreadsheetID = "";
   private static final JsonFactory JSON_FACTORY = GsonFactory.getDefaultInstance();
   private static final String totalList = "A2:D";
+  public static final String WIP = "Work In Progress - Please Try Again Later...";
 
   /**
    * Sets the spreadsheet ID basesd on the users entered URL
@@ -63,7 +65,6 @@ public class ScheduleManager
     else
       System.out.println("\nERROR. INVALID SHEET URL.");
     }
-    user.close();
   }
 
   /**
@@ -82,9 +83,10 @@ public class ScheduleManager
     Credential cred = new AuthorizationCodeInstalledApp(codeFlow,new LocalServerReceiver()).authorize("user");
     return cred;
   }
+
   /**
-   * Establishes Google's Google Sheets service and builds a Google sheets object enabling me to edit and/or create sheets
-   * @return Returns the Google Sheets object
+   * Establishes Google's Google Sheets service and builds a Google sheets object enabling the program to edit and/or create sheets
+   * @return Returns the the Google Sheets object
    * @throws IOException
    * @throws GeneralSecurityException
    */
@@ -93,47 +95,37 @@ public class ScheduleManager
     Credential cred = authorize();
     return new Sheets.Builder(GoogleNetHttpTransport.newTrustedTransport(), JSON_FACTORY, cred).setApplicationName(APPLICATION_NAME).build();
   }
-  /**
-   * Finds the real world current date
-   * @return returns the current date
-   */
-  public static String currentDateFinder()
+
+  //Class that holds the current real world date
+  public static class CurrentDate
   {
     DateTimeFormatter format = DateTimeFormatter.ofPattern("MM/dd/yy");
     String currentDate = LocalDate.now().format(format);
-    return currentDate;
-  }
-  /**
-   * Finds the real world current day
-   * @return returns the current day
-   */
-  public static int currentDayFinder()
-  {
-    String date = currentDateFinder();
-    int currentDay = Integer.parseInt(""+date.charAt(3)+date.charAt(4));
-    return currentDay;
-  }
-  /**
-   * Finds the real world current month
-   * @return returns the current month
-   */
-  public static int currentMonthFinder()
-  {
-    String date = currentDateFinder();
-    int currentMonth = Integer.parseInt(""+date.charAt(0)+date.charAt(1));
-    return currentMonth;
-  }
-  /**
-   * Finds the real world current year
-   * @return returns the current year
-   */
-  public static int currentYearFinder()
-  {
-    String date = currentDateFinder();
-    int currentYear = Integer.parseInt(""+date.charAt(6)+date.charAt(7));
-    return currentYear;
+    int currentDay = Integer.parseInt(""+currentDate.charAt(3)+currentDate.charAt(4));
+    int currentMonth = Integer.parseInt(""+currentDate.charAt(0)+currentDate.charAt(1));
+    int currentYear = Integer.parseInt(""+currentDate.charAt(6)+currentDate.charAt(7));
   }
 
+  //Enables the deletion of rows
+  private static class DeleteRow
+  {
+    int counter = 0;
+    BatchUpdateSpreadsheetRequest batchUpdate = new BatchUpdateSpreadsheetRequest();
+    Request delete = new Request().setDeleteDimension(new DeleteDimensionRequest().setRange(new DimensionRange().setSheetId(0).setDimension("ROWS").setStartIndex(1).setEndIndex(2)));
+    List<Request> deletions = new ArrayList<Request>();
+    /**
+     * The call that actually deletes the desired row
+     * @throws IOException
+     * @throws GeneralSecurityException
+     */
+    private void deleteCall() throws IOException, GeneralSecurityException
+    {
+      deletions.add(delete);
+      batchUpdate.setRequests(deletions);
+      getSheetService().spreadsheets().batchUpdate(spreadsheetID, batchUpdate).execute();
+      counter++;
+    }
+  }
   /**
    * Calls for the deletion of all expired assignment dates
    * @throws IOException
@@ -141,22 +133,18 @@ public class ScheduleManager
    */
   public static void deleteOldDates() throws IOException, GeneralSecurityException
   {
-    //Counts how many rows were deleted
+    //Keeps track of how many rows have been deleted
     int counter = 0;
-    //Declares the current day, month, and year
-    int currentMonth = currentMonthFinder();
-    int currentDay = currentDayFinder();
-    int currentYear = currentYearFinder();
-
+    //Gets todays date by creating a date object
+    CurrentDate date = new CurrentDate();
     //Places each value of the spreadsheet into an array
     ValueRange grab = getSheetService().spreadsheets().values().get(spreadsheetID, totalList).execute();
-    List<List<Object>> dates = grab.getValues();
-    
-    //Traverses the array and compares each rows date with the current date
-    if (dates == null || dates.isEmpty())
+    List<List<Object>> listDates = grab.getValues();
+    //Traverses the spreadsheet array and compares each rows date with the today's date
+    if (listDates == null || listDates.isEmpty())
       System.out.println("No data found...");
     else
-      for(List row : dates)
+      for(List row : listDates)
       {
         //Finds the specific rows date
         String setDate = row.get(2).toString();
@@ -164,52 +152,155 @@ public class ScheduleManager
         int setMonth = Integer.parseInt(""+setDate.charAt(0)+setDate.charAt(1));
         int setDay = Integer.parseInt(""+setDate.charAt(3)+setDate.charAt(4));
         int setYear = Integer.parseInt(""+setDate.charAt(6)+setDate.charAt(7));
-
-        //Sets necessary values for the deletion of a row
-        BatchUpdateSpreadsheetRequest batchUpdate = new BatchUpdateSpreadsheetRequest();
-        Request delete = new Request().setDeleteDimension(new DeleteDimensionRequest().setRange(new DimensionRange().setSheetId(0).setDimension("ROWS").setStartIndex(1).setEndIndex(2)));
-        List<Request> deletions = new ArrayList<Request>();
-
+        //Creates a delete row object
+        DeleteRow rowRemover = new DeleteRow();
         //If the rows date is older than the current date then the row will be deleted
-        if(currentYear > setYear)
-        {
-          deleteCall(delete, deletions, batchUpdate);
-          counter++;
-        }
-        else if(currentMonth > setMonth && currentYear == setYear)
-        {
-          deleteCall(delete, deletions, batchUpdate);
-          counter++;
-        }
-        else if(currentDay > setDay && currentYear == setYear && currentMonth == setMonth)
-        {
-          deleteCall(delete, deletions, batchUpdate);
-          counter++;
-        }
+        if(date.currentYear > setYear)
+          rowRemover.deleteCall();
+        else if(date.currentMonth > setMonth && date.currentYear == setYear)
+          rowRemover.deleteCall();
+        else if(date.currentDay > setDay && date.currentYear == setYear && date.currentMonth == setMonth)
+          rowRemover.deleteCall();
+        rowRemover.counter = counter;
       }
       if(counter == 0)
-        System.out.println("Every row is up to date!");
+        System.out.println("\nEvery row is up to date!");
       else
-        System.out.println(counter+" row(s) have been deleted!");
+        System.out.println("\n"+counter+" old row(s) have been deleted!");
   }
-  /**
-   * Is the actual method that deletes the the row
-   * @param r The request to delete
-   * @param l The array that stores the requests
-   * @param b Updates the spreadsheet so that the deletion executes
-   * @throws IOException
-   * @throws GeneralSecurityException
-   */
-  private static void deleteCall(Request r, List<Request> l, BatchUpdateSpreadsheetRequest b) throws IOException, GeneralSecurityException
+  public static void menuInputMismatchCatcher(/*Parameter is a static void method*/)
   {
-    l.add(r);
-    b.setRequests(l);
-    getSheetService().spreadsheets().batchUpdate(spreadsheetID, b).execute();
+    //I need to figure out how to make this possible
+    //The key to figuring this out is through lambda expressions
+    Scanner user = new Scanner(System.in);
+    boolean forward = false;
+    while(forward == false)
+    {
+      try
+      {
+        //myMethod(user);
+      }
+      catch(InputMismatchException i)
+      {
+        System.out.println("\nINVALID INPUT. PLEASE TRY AGAIN.");
+        user.nextLine();
+      }
+    }
+  }
+  public static void startMenu() throws IOException, GeneralSecurityException
+  {
+    Scanner user = new Scanner(System.in);
+    System.out.println("\nWelcome to the Google Sheets Schedule Mangement System.");
+    boolean forward = false;
+    while(forward == false)
+    {
+      try
+      {
+        System.out.print("\nTo begin, please type your option below.\n(1) - Create a new Google Sheet\n(2) - Use an existing Google Sheet\n(3) - Exit the program\n[Type Here]: ");
+        int pick = user.nextInt();
+        switch(pick)
+        {
+          case 1:
+            System.out.println(WIP);
+            break;
+          case 2:
+            sheetIDSetter();
+            sheetEditMenu();
+            forward = true;
+            break;
+          case 3:
+            System.out.println("\nClosing program... Thank you for your time...");
+            forward = true;
+            user.close();
+            break;
+          default:
+            System.out.println("\nINVALID INPUT. PLEASE TRY AGAIN.");
+            break;
+        }
+      }
+      catch(InputMismatchException i)
+      {
+        System.out.println("\nINVALID INPUT. PLEASE TRY AGAIN.");
+        user.nextLine();
+      }
+    }
+  }
+  public static void sheetEditMenu() throws IOException, GeneralSecurityException
+  {
+    Scanner user = new Scanner(System.in);
+    boolean forward = false;
+    while(forward == false)
+    {
+      try
+      {
+        System.out.print("\nWhat would you like to do to this Sheet?\n(1) - Sort by catagory\n(2) - Color by catagory\n(3) - Delete by catagory\n(4) - Go back\n[Type Here]: ");
+        int pick = user.nextInt();
+        switch(pick)
+        {
+          case 1:
+            System.out.println(WIP);
+            break;
+          case 2:
+            System.out.println(WIP);
+            break;
+          case 3:
+            deleteByCatMenu();
+            forward = true;
+            break;
+          case 4:
+            startMenu();
+            forward = true;
+            break;
+          default:
+            System.out.println("\nINVALID INPUT. PLEASE TRY AGAIN");
+        }
+      }
+      catch(InputMismatchException i)
+      {
+        System.out.println("\nINVALID INPUT. PLEASE TRY AGAIN.");
+        user.nextLine();
+      }
+    }
+  }
+  public static void deleteByCatMenu() throws IOException, GeneralSecurityException
+  {
+    Scanner user = new Scanner(System.in);
+    boolean forward = false;
+    while(forward == false)
+    {
+      try
+      {
+        System.out.print("\nWhat catagory would you like to delete by?\n(1) - Delete by title\n(2) - Delete by color\n(3) - Delete by expired dates\n(4) - Go back\n[Type Here]: ");
+        int pick = user.nextInt();
+        switch(pick)
+        {
+          case 1:
+            System.out.println(WIP);
+            break;
+          case 2:
+            System.out.println(WIP);
+            break;
+          case 3:
+            deleteOldDates();
+            break;
+          case 4:
+            sheetEditMenu();
+            forward = true;
+            break;
+          default:
+            System.out.println("\nINVALID INPUT. PLEASE TRY AGAIN.");
+        }
+      }
+      catch(InputMismatchException i)
+      {
+        System.out.println("\nINVALID INPUT. PLEASE TRY AGAIN.");
+        user.nextLine();
+      }
+    }
   }
 
   public static void main(String[] args) throws IOException, GeneralSecurityException
   {
-    sheetIDSetter();
-    deleteOldDates();
+    startMenu();
   }
 }
