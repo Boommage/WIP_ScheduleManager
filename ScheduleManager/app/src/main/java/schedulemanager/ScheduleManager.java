@@ -26,9 +26,13 @@ import com.google.api.client.json.gson.GsonFactory;
 import com.google.api.client.util.store.FileDataStoreFactory;
 import com.google.api.services.sheets.v4.Sheets;
 import com.google.api.services.sheets.v4.SheetsScopes;
+import com.google.api.services.sheets.v4.model.AddFilterViewRequest;
 import com.google.api.services.sheets.v4.model.BatchUpdateSpreadsheetRequest;
 import com.google.api.services.sheets.v4.model.DeleteDimensionRequest;
 import com.google.api.services.sheets.v4.model.DimensionRange;
+import com.google.api.services.sheets.v4.model.FilterCriteria;
+import com.google.api.services.sheets.v4.model.FilterView;
+import com.google.api.services.sheets.v4.model.GridRange;
 import com.google.api.services.sheets.v4.model.Request;
 import com.google.api.services.sheets.v4.model.ValueRange;
 
@@ -36,7 +40,7 @@ public class ScheduleManager
 {
   private static Sheets sheetService;
   private static final String APPLICATION_NAME = "TCU SCHEDULE MANAGER";
-  private static String spreadsheetID = "";
+  private static String spreadsheetID = "1Jpj5GbpAXukb07nTTKnDOMspYc-BESg8knN8FHBe6As";
   private static final JsonFactory JSON_FACTORY = GsonFactory.getDefaultInstance();
   private static final String totalList = "A2:D";
   public static final String WIP = "Work In Progress - Please Try Again Later...";
@@ -169,25 +173,27 @@ public class ScheduleManager
         System.out.println("\n"+counter+" old row(s) have been deleted!");
   }
 
-  public static void menuInputMismatchCatcher(/*Parameter is a static void method*/)//Currently an unused method
+  /**
+   * Currently an unused and unfunctional method
+   */
+  public static void menuInputMismatchCatcher(/*Parameter is a static void method*/)
   {
     //I need to figure out how to make this possible
     //The key to figuring this out is through lambda expressions
-    Scanner user = new Scanner(System.in);
     boolean forward = false;
     while(forward == false)
     {
       try
       {
-        //myMethod(user);
+        //anyPossibleMethod(forward);
       }
       catch(InputMismatchException i)
       {
         System.out.println("\nINVALID INPUT. PLEASE TRY AGAIN.");
-        user.nextLine();
       }
-    }
+    } 
   }
+
   public static void startMenu() throws IOException, GeneralSecurityException
   {
     Scanner user = new Scanner(System.in);
@@ -299,9 +305,30 @@ public class ScheduleManager
       }
     }
   }
+  public static void filter(String type)
+  {
+    switch(type)
+    {
+      case "title":
+        break;
+      case "color":
+        break;
+      case "date":
+        break;
+    }
+  }
 
   public static void main(String[] args) throws IOException, GeneralSecurityException
   {
+    /*
+    BatchUpdateSpreadsheetRequest batchUpdate = new BatchUpdateSpreadsheetRequest();
+    //Request delete = new Request().setDeleteDimension(new DeleteDimensionRequest().setRange(new DimensionRange().setSheetId(0).setDimension("ROWS").setStartIndex(1).setEndIndex(2)));
+    Request sort = new Request().setAddFilterView(new AddFilterViewRequest().setFilter(new FilterView().setFilterViewId(0).setTitle("Class").setRange(new GridRange().setStartColumnIndex(0).setEndColumnIndex(2))));
+    List<Request> sorts = new ArrayList<Request>();
+    sorts.add(sort);
+    batchUpdate.setRequests(sorts);
+    getSheetService().spreadsheets().batchUpdate(spreadsheetID, batchUpdate).execute();
+    */
     startMenu();
   }
 }
