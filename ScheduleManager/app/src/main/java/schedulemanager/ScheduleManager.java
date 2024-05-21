@@ -40,6 +40,7 @@ public class ScheduleManager
 {
   private static Sheets sheetService;
   private static final String APPLICATION_NAME = "TCU SCHEDULE MANAGER";
+  //This needs to be implemented for all spreadsheets
   private static String spreadsheetID = "1Jpj5GbpAXukb07nTTKnDOMspYc-BESg8knN8FHBe6As";
   private static final JsonFactory JSON_FACTORY = GsonFactory.getDefaultInstance();
   private static final String totalList = "A2:D";
